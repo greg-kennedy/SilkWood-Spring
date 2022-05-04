@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+ <schedule>
+  <activity name="Wake up" at="7:00">
+    <action>wakeUp</action>
+    <action>stretch</action>
+  </activity>
+  <activity name="Work" at="7:01">
+    <action>gatherFood</action>
+  </activity>
+  <activity name="Play" at="12:00">
+    <action>dance</action>
+  </activity>
+  <activity name="Work" at="12:01">
+    <action>gatherFood</action>
+  </activity>
+  <activity name="Go Home" at="17:00">
+    <action>dropOfFood</action>
+  </activity>
+  <activity name="Watch TV" at="17:01">
+    <action>watchTV</action>
+  </activity>
+  <activity name="Go to Bed" at="22:00">
+    <action>sleep</action>
+  </activity>
+ </schedule>
+
+
+
+this.BedTime =
+this.tvTime =
+this.fromWorkTime = 
+this.workTime2 = 
+this.breakTime = 
+this.workTime = 
+this.strechUpTime = 
+this.wakeUpTime = 

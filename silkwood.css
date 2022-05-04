@@ -1,0 +1,7 @@
+.focusObject{
+  border:3px solid yellow;
+}
+
+.unFocusObject{
+  border:1px solid white;
+}

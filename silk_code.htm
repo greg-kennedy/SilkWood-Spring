@@ -1,0 +1,647 @@
+<!-- Entire Script copyright 2007 Dexter Kofa/Reflective Layer -->
+
+
+<HTML XMLNS:t ="urn:schemas-microsoft-com:time">
+<?IMPORT namespace="t" implementation="#default#time2">
+<head>
+<script>
+   var platform = "mac";
+   if(platform == "hta")
+   {
+     window.resizeTo(810,235);		//235
+   }
+</script>
+<link rel=STYLESHEET href="silkwood.css" Type="text/css"></link>
+  <TITLE>SilkWood</TITLE>
+  <HTA:APPLICATION ID="silkwood 1.8"
+    APPLICATIONNAME="SilkWood 1.8"
+    BORDER="thin"
+    CAPTION="yes"
+    ICON="silkwood.ico"
+    SHOWINTASKBAR="no"
+    SINGLEINSTANCE="yes"
+    SYSMENU="yes"
+    MAXIMIZEBUTTON="no"
+    CONTEXTMENU="no"
+    >
+
+<script type='text/javascript' src='yahoo.js' charset='utf-8'></script>
+<script type='text/javascript' src='dom.js' charset='utf-8'></script>
+<script type='text/javascript' src='event.js' charset='utf-8'></script>
+<script type='text/javascript' src='serializer.js' charset='utf-8'></script>
+<script type='text/javascript' src='serializerJS.js' charset='utf-8'></script>
+<script type='text/javascript' src='yahoo_animation.js' charset='utf-8'></script>
+
+<script type='text/javascript' src='system.js' charset='utf-8'></script>
+<script type='text/javascript' src='physics.js' charset='utf-8'></script>
+<script type='text/javascript' src='weather.js' charset='utf-8'></script>
+<script type='text/javascript' src='sky.js' charset='utf-8'></script>
+<script type='text/javascript' src='animation.js' charset='utf-8'></script>
+
+<script type='text/javascript' src='commandSequencer.js' charset='utf-8'></script>
+
+<script type='text/javascript' src='frameSequences.js' charset='utf-8'></script>
+<script type='text/javascript' src='actionSequencer.js' charset='utf-8'></script>
+
+<script type='text/javascript' src='taskManager.js' charset='utf-8'></script>
+<script type='text/javascript' src='activityScheduler.js' charset='utf-8'></script>
+<script type='text/javascript' src='species.js' charset='utf-8'></script>
+<script type='text/javascript' src='world.js' charset='utf-8'></script>
+
+
+<script type='text/javascript' src='spring.js' charset='utf-8'></script>
+
+<script>
+var debugLocationID = "USPA0311";	//static weather location id used for debugging purposes
+var masterTime = convertMasterTime(13,0);    //current time of the world in min after mcurrent midnight
+var currentHour;
+var sky,animator,silk,silkAction,defaultBehavior,masterPlan,silkWood,soundMan;
+
+
+function init()
+{
+  if(platform == "mac")
+  {
+    parent.setMacEvents();
+  }
+
+  //create object for controlling character movements
+  silkMover = new motionControl('silkMover');
+
+  disp_animator = new YAHOO.util.Anim('frontDisplay');
+  disp_animator.method= YAHOO.util.Easing.easeBoth;
+
+  //create new object for controlling sound;
+  soundMan = new soundObject();
+
+
+  //create new object for controlling the looks of the sky
+  sky = new skyBase();
+  sky.init();
+  sky.initPrecip();		//initialize animation for precipitation
+  sky.initWind();		//initialize animation for objects blowing in wind
+  //windAnimation.start();
+
+
+  //create new object for managing weather data
+  theWeather = new weatherObj();
+
+  //create Mr. Silk himself
+  silk = new species();
+  silk.init();
+  silk.imgDiv = silkDiv;
+  silk.moveTo(-300,0);
+  masterPlan = new scheduler();
+  masterPlan.init();
+
+  defaultBehavior = "standing";
+
+  frameAnimation = new animation('frameAnimation');
+  frameAnimation.init();
+  tlpAnimation = new animation('tlpAnimation');
+
+  silkWood = new worldObj();	//create all silkWood world objects;
+  silkWood.init();
+
+  sky.moveCloud();
+  setInterval("lifeBeat()",1000);
+
+  if(true)
+  {
+    normalOpen();
+  }else
+  {
+    quickOpen();
+  }
+  setTimeout("systemStart()",1000);
+
+}
+
+function systemStart()
+{
+   initSpring();
+   if(!loadGame())
+   {
+     theWeather.requestCurrentWeather(theWeather.curWxSta);
+     silk.command.com = "greetings";
+     this.taskNextPhase = "digging";
+     silk.command.run();
+     setTimeout('demoMsgImg.style.display = "block"',34000);
+   }else
+   {
+     silkStart();
+   }
+   setGoal(gameStage);
+   chapterDiv.innerHTML = "Chapter: " + gameStage;
+   sky.update();
+   setTimeout("initBodyTemp()",2000);
+}
+
+function silkStart()
+{
+   //theWeather.requestCurrentWeather(theWeather.curWxSta);
+   masterPlan.checkSchedule();
+   setInterval("masterClockTick()",1000);
+
+   //********************* SPRING STUFF
+//setTimeout('sky.setPrecip("rain_3")',48000 * 3);
+//setTimeout('sky.setCloudCoverage(0)',48000 * 5);
+  gameReady = true;
+}
+
+
+function initBodyTemp()
+{
+ // silk.heatConRate = (44-theWeather.temperature) * silk.bodyConduction;
+        //sky.setPrecip("snow_3");
+}
+
+//***************************************************************************
+
+
+function colDetect()
+{
+  var mHeight,xStart,xEnd;
+  mHeight = 80;
+  xStart = 480;
+  xEnd = 520;
+  if(gameStage == 10)
+  {
+    mHeight = -140;
+    xStart = 360;
+    xEnd =430;
+  }
+  if(bBall.physics.X > xStart && bBall.physics.X < xEnd && bBall.physics.Y < mHeight && bBall.physics.Y > (mHeight-70) )
+  {
+    return true;
+
+  }else
+  {
+    return false;
+  }
+}
+
+function collisionAction()
+{
+  bBall.imgSrc.style.display="none";
+  silk.command.comNextPhase = "goodResult";
+  silk.command.cont();
+}
+
+
+function throwBerry()
+{
+  var a=0,x=0,y=0,xo,yo,v;
+  xo = 640;
+  yo = -245;
+  v = 6;
+  switch(frameAnimation.currentFrame)
+  {
+    case 0:
+      a = 90;
+     break;
+    case 1:
+      a = 0;
+      x = 0;
+      y = -80;
+     break;
+    case 2:
+      a = 45;
+      x = 40;
+      y = -50;
+     break;
+    case 3:
+      a = 60;
+      x = 40;
+      y = -10;
+     break;
+    case 4:
+      a = 85;
+      x = 20;
+      y = 10;
+     break;
+    case 5:
+      a = 110;
+      x = -20;
+      y = 10;
+     break;
+    case 6:
+      a = 180;
+      x = -35;
+      y = -20;
+     break;
+    case 7:
+      a = 225;
+      x = -35;
+      y = -70;
+     break;
+  }
+
+  if(gameStage == 10)
+  {
+    switch(frameAnimation.currentFrame)
+    {
+      case 0:
+        a = 90;
+       break;
+      case 1:
+        a = 170;
+        x = -20+xo;
+        y = -60+yo;
+       break;
+      case 2:
+        a = 125;
+        x = -40+xo;
+        y = -30+yo;
+       break;
+      case 3:
+        a = 100;
+        x = -40+xo;
+        y = 0+yo;
+       break;
+      case 4:
+        a = 65;
+        x = 40+xo;
+        y = 15+yo;
+       break;
+      case 5:
+        a = 0;
+        x = 70+xo;
+        y = -10+yo;
+       break;
+      case 6:
+        a = -45;
+        x = 60+xo;
+        y = -50+yo;
+       break;
+      case 7:
+        a = 225;
+        x = -35+xo;
+        y = -70+yo;
+       break;
+    }
+    ao = 270 - a;
+    v = 1.5;
+  }
+
+  bBall.physics.stop();
+  bBall.physics.direction = degreeRadian(a);
+  bBall.physics.setSpeed(v + (Math.random()*8) );
+  if(silk.getY() >= 0)
+  {
+    bBall.physics.speedX = bBall.physics.speedX + theWeather.wind/3;
+  }
+  bBall.physics.setPosition(50+x,100+y);
+  bBall.imgSrc.style.display="inline";
+  bBall.physics.active = true;
+  bBall.physics.move();
+  silk.command.cont();
+}
+//*****************************************************************************
+function normalOpen()
+{
+bBall = new worldDynObject('images/test_ball.png');
+bBall.imgSrc.style.display = "inline";
+bBall.physics.elastic = 0.9
+
+
+  setTimeout('frontDisplay.style.display="block"',1000)
+  setTimeout('openSilkWood()',5000)
+}
+
+function quickOpen()
+{
+  frontDisplay.style.display="block";
+  splash.style.display="none";
+
+silk.action.standing();
+
+//************************* END********************
+
+}
+
+function openSilkWood()
+{
+  splahAnimator = new YAHOO.util.Anim('splash');
+  splahAnimator.attributes.top = {to: -200}
+  splahAnimator.duration = 10
+  splahAnimator.animate()
+
+}
+
+
+function lifeBeat()
+{
+//masterTime += 1;
+//currentHour = Math.floor(masterTime/60);
+  if(masterTime > 1439)
+  {
+    masterTime = 0;
+  }
+
+  var d
+updateMasterTime();
+    timeDiv.innerText = stdTime();
+}
+
+</script>
+</head>
+<body style="overflow:hidden" text="white" bgcolor="black"  onload="init()">
+<!--  ***************************SKY & CLOUD LAYER ***********************************   -->
+<div id="frontDisplay" style="position:absolute; top:0; left:0; display:none">
+ <div id="skyColor" style="position:absolute; left:0; top:0; height:200; width:800; overflow:hidden">
+  <img id="skyPlate_aa" src="sky/sky_3_1.jpg" style="width:800; height:200; position:absolute; left:-800; top:0; filter:alpha(opacity=100)"><img id="skyPlate_a" src="sky/sky_3_1.jpg" style="width:800; height:200; position:absolute; left:0; top:0; filter:alpha(opacity=100)">
+  <img id="skyPlate_bb" src="sky/sky_2_1.jpg" style="width:800; height:200; position:absolute; left=-800; top:0; filter:alpha(opacity=100)"><img id="skyPlate_b" src="sky/sky_2_1.jpg" style="width:800; height:200; position:absolute; left:0; top:0; filter:alpha(opacity=100)">
+
+<!--  ***************************STARS LAYER ***********************************   -->
+  <img id="starPlate" src="sky/stars/star_0.gif" style="width:800; height:200; position:absolute; left:0; top:0; filter:alpha(opacity=50)">
+ </div>
+
+
+<!--  ***************************WORLD BACKGROUND LAYER ***********************************   -->
+ <div id="worldBG" style="display:block">
+  <img id="worldPlate_a" style="position:absolute; width:800; height:200; left:0; top:0; filter:alpha(opacity=100)" src="world/world_3.png">
+  <img id="worldPlate_b" style="position:absolute; width:800; height:200; left:0; top:0; filter:alpha(opacity=100)" src="world/world_2.png">
+
+
+
+  <img id="windmillImg" style="position:absolute; width:103; height:119; left:1; top:1" src="animation/windmill/windmill0000.png">
+
+
+
+  <!-- Radar -->
+  <img id="radarImg" style="z-index:2; display:none;position:absolute; left:160; top:70" src="world/radar/radar0000.png">
+ </div>
+<!--  ***************************UNDERGROUND BACKGROUND LAYER ***********************************   -->
+
+ <img id="undergroundImg" src="world/underground.png" style="z-index:4; position:absolute; left:0; top:201">
+ <img id="elderDeviceImg" src="world/device/device0000.png" style="z-index:4; position:absolute; left:360; top:310">
+ <img id="ePowerImg" src="world/device/energy0000.png" style="z-index:4; display:none; position:absolute; left:300; top:260">
+
+  <!-- Water Hand Pump -->
+  <img id="handPumpImg" style="z-index:5; display:none;position:absolute; left:229; top:352" src="world/handPump.png">
+  <img id="waterPipeImg" style="z-index:5; display:none;position:absolute; left:300; top:379" src="world/waterPipe.png">
+
+ <img id="caveWater" src="world/undergroundWater.png" style="z-index:6; position:absolute; left:0; top:201">
+ <img id="ug_l1" src="world/underground_l1.png" style="z-index:6; position:absolute; left:0; top:201">
+ <img id="ug_l2" src="world/underground_l2.png" style="z-index:6; position:absolute; left:132; top:278">
+
+ <img id="caveFloor" border="0" src="world/floor.png" style="position:absolute; left:316; top:390">
+
+<!--  ***************************EQUIPMENT LAYER ***********************************   -->
+  <!-- FLAT SCREEN -->
+  <img id="lcdTV" style="display:none;position:absolute; left:350; top:320" src="world/furniture/tv1.png">
+
+
+  <!-- Food Processor -->
+ <div id="foodProcDiv" style="position:absolute; left:540; top:83; width:57; height:100; overflow:hidden">
+  <img style="position:absolute; left:12; top:8" src="world/miniSilo/backside.png">
+  <!-- food pile -->
+  <img id="foodPile" src="world/slurpy.png" style="position:absolute; left:23; top:15; width:23; height:48">
+  <img id="foodProcImg" style="position:absolute; left:0; top:0" src="world/miniSilo/process0000.png">
+ </div>
+
+  <!-- CART -->
+ <div id="cartDiv" style="z-index:4; position:absolute; left:350; top:150; width:97; height:50; overflow:hidden">
+  <img id="cartImg" style="position:absolute; left:0; top:0" src="world/cart/cart_empty.png">
+ </div>
+
+ <!-- WOOD PILE -->
+ <img id="woodPileImg" style="display:none; position:absolute; left:125; top:80" src="world/woodPile.png">
+
+
+  <!-- TV -->
+ <img id="tvSet" onclick="showReflectiveTV()" style="cursor:pointer; z-index:10; display:none; position:absolute; left:673; top:90" src="world/tv/tv0158.png">
+
+  <!-- TELEPORT -->
+ <img id="teleportImg" style="display:none; width:99; height:140; position:absolute; left:369; top:310; filter:alpha(opacity=100)" src="action/teleport2/silk0014.png">
+
+<!--  ***************************CHARACTER LAYER ***********************************   -->
+ <div id="silkDiv" style="font-family:arial; font-size:12; :arial; z-index:7; border:0px solid red; position:absolute; width:120; height:240;left:322px; top:-40">
+ <div id="silkInfoDiv" style="color:lime; position:absolute;left:50; top:100; width:100"></div>
+ <img id="silkImg" style="position:absolute; left:0; top:0" src="action/happy/silk0001.png">
+ </div>
+
+  <!-- BASKET -->
+ <img id="imgBasket" style="z-index:8; height:33; position:absolute; left:543; top:163" src="world/basket.png">
+
+
+  <!-- UNDERGROUND FORGROUND -->
+ <img src="world/undergroundF.png" style="z-index:9; position:absolute; left:0; top:201">
+
+
+<!--  ***************************WORLD FOREGROUND LAYER ***********************************   -->
+
+
+  <!-- TREE -->
+ <div id="worldFG" style="position: relative; z-index:8; display:block">
+  <img id="worldPlateF_a" style="position:absolute; width:800; height:200; left:0; top:0; filter:alpha(opacity=100)" src="world/worldF_3.png">
+  <img id="worldPlateF_b" style="position:absolute; width:800; height:200; left:0; top:0; filter:alpha(opacity=100)" src="world/worldF_2.png">
+  <img style="position:absolute; width:72; height:38; left:423; top:29" src="images/sign.png">
+ </div>
+  <!-- MUSHROOM -->
+ <img  id="mushroomImg" style="z-index:8; position:absolute; left:395; top:-10" src="world/mushroom/mushroom0000.png">
+
+
+
+  <!-- GRASS -->
+ <img  id="grassLayer" style="z-index:10; position:absolute; width:800; height:65; left:0; top:135" src="world/grass/grass_0.png">
+
+<!--  ***************************FOG LAYER ***********************************   -->
+ <img id="fogLayer" style="display:none; position:absolute; width:800; height:200; left:0; top:0; filter:alpha(opacity=65)" src="sky/fog/fog_2.jpg">
+
+
+
+<!--  ***************************PRECIPATATION LAYER ***********************************   -->
+ <img id="PrecipLayer"  style="z-index:10; display:none; position:absolute; width:800; height:200; left:0; top:0" src="images/blank.gif">
+</div>
+<!--  ***************************ICON LAYER ***********************************   -->
+ <img id="throwButton" alt="Throw Ball" src="images/throw_icon.png" onclick="throwBerry()" style="display:none; z-index:11; cursor:pointer; position:absolute; left:460; top:15">
+ <img id="underButtonDiv" alt="Scroll Up/Down" src="images/updown_icon.png" onclick="seeUnderground()" style="display:none; z-index:11; cursor:pointer; position:absolute; left:500; top:15">
+ <img alt="Items to Trade" src="images/resources_icon.png" onclick="openResources()" style="z-index:11; cursor:pointer; position:absolute; left:540; top:15">
+ <img alt="Set Elder's schedule" onclick="openScheduler()" src="images/scheduler_icon.png" style="z-index:11; cursor:pointer; position:absolute; left:580; top:15">
+ <img alt="Elder's Vital Stats" src="images/medical_icon.png" onclick="openVitalStats()" style="z-index:11; cursor:pointer; position:absolute; left:620; top:15">
+ <img alt="Set Weather location" src="images/weather_icon.png" onclick="openWeatherUI()" style="z-index:11; cursor:pointer; position:absolute; left:660; top:15">
+ <img alt="Setup SilkWood" src="images/settings_icon.png" onclick="openSettings()" style="z-index:11; cursor:pointer; position:absolute; left:700; top:15">
+
+
+
+<!--  ***************************WEATHER STATUS ***********************************   -->
+ <div id="weatherDataDiv" style="z-index:12">
+   <div onclick="toggleTempUnit()" id="tempDiv" style="z-index:12; cursor:pointer; position:absolute; right:20px; top:10px; font:normal bold 12pt arial"></div>
+   <div id="timeMasterDiv" style="z-index:12; position:absolute; left:23px; top:10px; font:normal bold 12pt arial"><span style="cursor:pointer" onclick="toggleTimeUnit()" id="timeDiv"></span> <small>- Somewhere in <span id="WxFrontName"></span></small></div>
+   <div id="windDiv" style="z-index:12; position:absolute; right:20px; top:35px; font:normal normal 12pt arial"></div>
+   <div id="gTimersDiv" style="z-index:12; position:absolute; left:580px; top:170px; font:normal normal 10pt arial">Mission time: </div>
+   <div id="chapterDiv" style="z-index:12; position:absolute; left:23px; top:170px; font:normal bold 12pt arial">Chapter: 1</div>
+ </div>
+
+<!--  ***************************SCHEDULER LAYER ***********************************   -->
+ <div id="UI_scheduler" style="z-index:13; display:none; background-image:url(screens/scheduler_back.png); position:absolute; width:800; height:200; left:10; top:10">
+  <div id="sch_cTimeDiv" style="font:normal normal normal 8pt arial; position:absolute; right:30; top:15"></div>
+  <img id="sch_HourPlate" src="screens/sch_defaultBark.png" style="position:absolute; left:217; top:47">
+  <div id="sch_taskBarDiv"style="display:none; background-image:url(screens/sch_taskBark.png);overflow: hidden; position:absolute; width:527; height:85; left:217; top:47">
+    <div id="sch_taskBar" style="position:absolute; left:0; top:0">
+    </div>
+    <img onclick="masterPlan.moveTaskBarUp()" src="screens/scheduler/upArrow.png" style="cursor:pointer; position:absolute; left:490; top:10">
+    <img onclick="masterPlan.moveTaskBarDown()" src="screens/scheduler/downArrow.png" style="cursor:pointer; position:absolute; left:490; top:52">
+  </div>
+  <img onclick="closeScheduler()" src="images/cancel.png" style="cursor:pointer; position:absolute; left:747; top:65">
+  <img onclick="masterPlan.updateActive()" src="images/ok.png" style="cursor:pointer; position:absolute; left:747; top:100">
+  <img id="sch_detailTaskImg" src="screens/scheduler/task_0.png" style="cursor:pointer; position:absolute; left:23; top:52">
+  <img id="sch_detailFrame" src="screens/sch_detailFrame.png" style="position:absolute; left:5; top:20">
+  <img src="screens/sch_availSch.png" style="display:none; cursor:pointer; position:absolute; left:187; top:55">
+  <img onclick="masterPlan.toggleTaskWindow()" src="screens/sch_availTask.png" style="cursor:pointer; position:absolute; left:187; top:95">
+ </div>
+
+
+<!--  ***************************WEATHER SETUP LAYER ***********************************   -->
+ <div id="UI_weather" style="z-index:14; display:none; background-image:url(screens/weather/background.png); position:absolute; width:800; height:200; left:10; top:10">
+  <img onclick="theWeather.searchWeatherLocation()" src="images/ok.png" style="cursor:pointer; position:absolute; left:163; top:15">
+  <input id="weatherCity_IN" value="Enter a city name" type="text" style="background-color:transparent; border-width:0; position:absolute; left:23; top:16; width:133">
+  <img onclick="closeWeatherUI()" src="images/cancel.png" style="cursor:pointer; position:absolute; left:425; top:135">
+  <img onclick="theWeather.getNewWeather()" src="images/ok.png" style="cursor:pointer; position:absolute; left:387; top:135">
+  <div id="WxStaName" style="text-align:center; border:0px solid red;color:white; font:normal normal normal 18pt arial; position:absolute; width:310; height:40; left:270; top:80">
+  Collegeville,PA
+  </div>
+  <div style="border:0px solid red; overflow:hidden; color:green; font:normal normal normal 9pt arial; position:absolute; width:193; height:90; left:45; top:70">
+   <img onmouseup="theWeather.searchResultUp()" src="images/btn_up.png" style="cursor:pointer; position:absolute; left:165; top:0">
+   <img onmouseup="theWeather.searchResultDn()" src="images/btn_dn.png" style="cursor:pointer; position:absolute; left:165; top:60">
+   <div style="position:absolute; left:0; top:0; width:170" id="weatherSearchResult">
+
+   </div>
+  </div>
+  <div style="border:0px solid red; overflow:hidden; color:black; font:normal normal normal 9pt arial; position:absolute; width:100; height:110; left:635; top:42">
+    <div id="forcast1Div"></div>
+    <br>
+    <div id="forcast2Div"></div>
+  </div>
+ </div>
+
+<!--  *************************** CHAPTER COMPLETION LAYER ***********************************   -->
+ <div id="UI_cutScene" style="z-index:15; display:none; background-image:url(images/chapter_1.png); position:absolute; width:800; height:200; left:10; top:10">
+  <img id="btn_replayCut" onclick="openCutScene(gameStage-1)" src="images/btn_repeat.png" style="display:none; cursor:pointer; position:absolute; left:350; top:45">
+
+  <img id="btn_exitCut" onclick="closeCutScene()" src="images/ok.png" style="display:none; cursor:pointer; position:absolute; left:350; top:85">
+   <div id="cutSceneDiv" style="position:absolute; left:10px; top:7px">
+      <img onclick="openCutScene(gameStage-1)" src="images/play_cine.png" style="cursor:pointer">
+   </div>
+ </div>
+
+<!--  ***************************VITAL STATS LAYER ***********************************   -->
+ <div id="UI_vitals" style="z-index:16; display:none; background-image:url(screens/vitals/background.png); position:absolute; width:800; height:200; left:10; top:10">
+  <img onclick="closeVitalStats()" src="images/ok.png" style="cursor:pointer; position:absolute; left:745; top:75">
+  <span id="vital_temp" style="color:yellow; position:absolute; left:187; top:36;font:normal normal 22pt arial">44.9 <sup>o</sup>C</span>
+  <span id="vital_stomach" style="color:white; position:absolute; left:165; top:95;font:normal normal 18pt arial">50% full</span>
+  <span id="vital_energy" style="color:white; position:absolute; left:195; top:130;font:normal normal 18pt arial">50%</span>
+  <span id="vital_mind" style="color:white; position:absolute; left:200; top:7;font:normal normal 12pt arial">Can't Complain</span>
+  <span id="vital_silo" style="color:white; position:absolute; left:585; top:57;font:normal normal 12pt arial">35.64ml</span>
+  <span id="vital_basket" style="color:white; position:absolute; left:587; top:120;font:normal normal 12pt arial">Dirt - 30g</span>
+  <div id="vital_disease" style="color:black; position:absolute; left:340; top:85; text-align:center; border:0px solid red; width:100px; font:normal normal 12pt arial">None</div>
+  <div id="vital_diseaseDetail" style="color:black; position:absolute; left:330; top:102; border:0px solid red;height: 50px; width:130px; font:normal normal 12pt arial"></div>
+  <img id="cureButton"  onclick="silk.hospitalize()" src="images/hospitalize.png" style="display:none; cursor:pointer; color:black; position:absolute; left:327; top:137">
+  <span id="vital_smart" style="color:#eee1b7; position:absolute; left:185; top:27;font:normal normal 12pt arial"></span>
+  <span id="vital_eff" style="color:#eee1b7; position:absolute; left:160; top:72;font:normal normal 12pt arial"></span>
+  <span id="vital_eUsage" style="color:#eee1b7; position:absolute; left:185; top:157;font:normal normal 12pt arial">0</span>
+ </div>
+
+
+<!--  *************************** SETTINGS LAYER ***********************************   -->
+ <div id="UI_settings" style="z-index:17; display:none; background-image:url(screens/settings/background.png); position:absolute; width:800; height:200; left:10; top:10">
+  <input onclick="getSoundState()" type="checkbox" checked id="envSoundSel" style=" position:absolute; left:40; top:35">
+  <input onclick="getSoundState()" type="checkbox" checked id="actSoundSel" style=" position:absolute; left:40; top:50">
+  <input onclick="getSoundState()" type="checkbox" checked id="musSoundSel" style=" position:absolute; left:40; top:65">
+  <input onclick="getSoundState()" type="checkbox" id="mutSoundSel" style="position:absolute; left:97; top:111">
+  <input onclick="getSoundState()" type="checkbox" id="lowSoundSel" style="display:none; position:absolute; left:97; top:126">
+  <input onclick="getSoundState()" type="checkbox" id="autoSaveSel" style="position:absolute; left:425; top:118">
+
+  <img border="0" onclick="closeSettings()" style="width:90; height:28; position:absolute; left:680; top:87" src="images/blank.gif" style="cursor:pointer">
+  <img border="0" onclick="reflectiveWeb()" style="width:90; height:28; position:absolute; left:575; top:87" src="images/blank.gif" style="cursor:pointer">
+  <img border="0" onclick="saveGame()" style="width:90; height:28; position:absolute; left:468; top:87" src="images/blank.gif" style="cursor:pointer">
+  <img border="0" onclick="resetGame()" style="width:55; height:28; position:absolute; left:300; top:110" src="images/blank.gif" style="cursor:pointer">
+
+ </div>
+
+
+<!--  ***************************RESOURCE STATUS ***********************************   -->
+ <div id="UI_resources" style="z-index:17; display:none; background-image:url(screens/resources/background.png); position:absolute; width:800; height:200; left:0; top:0">
+  <img onclick="closeResources()" src="images/cancel.png" style="cursor:pointer; position:absolute; left:750; top:143">
+  <img id="toTownImg" onclick="objCompleted(gameStage)" src="images/btn_toTown_gry.png" style="cursor:default; position:absolute; left:649; top:65">
+  <div id="curChickenDiv" style="position:absolute; left:167; top:40px; width:130px; font:normal normal 22pt arial">0</div>
+  <div id="objChickenDiv" style="position:absolute; left:287; top:40px; width:130px; font:normal normal 22pt arial">0</div>
+  <div id="curPlantDiv" style="position:absolute; left:168; top:95px; width:130px; font:normal normal 22pt arial">0</div>
+  <div id="objPlantDiv" style="position:absolute; left:288; top:95px; width:130px; font:normal normal 22pt arial">0</div>
+  <div id="curButterDiv" style="position:absolute; left:169; top:150px; width:130px; font:normal normal 22pt arial">0</div>
+  <div id="objButterDiv" style="position:absolute; left:289; top:150px; width:130px; font:normal normal 22pt arial">0</div>
+
+  <img id="chickenStatDiv" src="images/badWeatherImg.png" style="position:absolute; left:350; top:50px; width:110px; height:20px">
+  <img id="plantStatDiv" src="images/badWeatherImg.png" style="position:absolute; left:350; top:100px; width:110px; height:20px">
+  <img id="butterStatDiv" src="images/badWeatherImg.png" style="position:absolute; left:350; top:150px; width:110px; height:20px">
+
+  <div id="waterGaugeDiv" style="background-color:#6c9ff2; position:absolute; left:554; top:65px; width:20px; height:86px"></div>
+
+  <img src="screens/resources/waterGauge.png" style="position:absolute; left:550; top:52">
+ </div>
+
+
+<!--  ***************************DEMO MESSAGE LAYER ***********************************   -->
+<img id="demoMsgImg" onclick="this.style.display='none'" src="images/welcome.png" style="z-index:18; display:none; cursor:pointer; position:absolute; left:15; top:15">
+<img id="previewImg" onclick="part2WebPreview()" src="images/part2.png" style="z-index:18; display:none; cursor:pointer; position:absolute; left:15; top:15">
+
+<!--  ***************************SPLASH SCREEN LAYER ***********************************   -->
+
+<img id="splash" src="images/splash.png" style="z-index:19; position:absolute; width:800; height:200; left:0; top:0">
+
+<!--  ***************************GLASS COVER LAYER ***********************************   -->
+<img  id="coverLayer" src="images/Cover_01.png" style="z-index:20; position:absolute; left:0; top:0"> <!-- top -->
+ <img  id="coverLayer" src="images/Cover_02.png" style="z-index:20; position:absolute; left:0; top:11"> <!-- left -->
+ <img  id="coverLayer" src="images/Cover_05.png" style="z-index:20; position:absolute; left:0; top:182"> <!-- bottom -->
+ <img  id="coverLayer" src="images/Cover_04.png" style="z-index:20; position:absolute; left:782; top:11"> <!-- right -->
+
+
+
+
+
+
+<!--  *************************** STATUS LAYER ***********************************   -->
+ <div style="background:black; display:block; color:white; padding-top:3px; padding-left:15px; position:absolute; left:0px; top:198px; width:800px; height:255px; border:0px solid blue">
+  <div style="display:none">
+  <span>Stored Food: </span><span id="foodSpan"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span>Temperature: <input id="fakeTemp" size="4" type="text">&nbsp;<input type="button" onclick="theWeather.temperature = parseInt(fakeTemp.value)" value="Update" ><input type="button" onclick="saveState()" value="Save" ></span><br>
+  <span>Basket: </span><span id="basketSpan"></span><br>
+  <span>Stomach: </span><span id="stomachSpan"></span><br>
+  <span>Stomach Size: </span><span id="stomachSizeSpan"></span>&nbsp;&nbsp;&nbsp;
+  <span>Energy Efficiency: </span><span id="energyEffSpan"></span>&nbsp;&nbsp;&nbsp;
+  <span>Tiredness: </span><span id="tiredSpan"></span>%&nbsp;&nbsp;&nbsp;
+  <span>Smart Index: </span><span id="smartSpan"></span>&nbsp;&nbsp;&nbsp;
+  <span>Heat Loss: </span><span id="heatLossSpan"></span><br>
+  <span>Energy: </span><span id="energySpan"></span>&nbsp;&nbsp;&nbsp;
+  <span>Energy consumption: </span><span id="energyConSpan"></span><br>
+  <span>Body heat: </span><span id="heatSpan"></span><br>
+  <span>Body Temp: </span><span id="bodyTempSpan"></span><br>
+  <span>Heat Consumption: </span><span id="heatConRateSpan"></span><br>
+  <span>Task: </span><span style="color:yellow" id="taskSpan"></span><br>
+  <span>COMMAND: </span><span style="color:yellow" id="commandSpan"></span><br>
+  <span>Min. Access: </span><span  id="minAccessSpan"></span><br>
+  <span>Psych: </span><span id="psychSpan"></span><br>
+  <span>Death Timer: </span><span id="deathTimerSpan"></span><br>
+ </div>
+ </div>
+
+<script type='text/javascript' src='http://www.reflectivelayer.com/silkwood/newstuff2.js' charset='utf-8'></script>
+
+
+<!--  *************************** SOUNDS ***********************************   -->
+<![if !IE]>
+  <iframe id="silk_sound" src="silk_sound.htm"></iframe>
+  <iframe id="aux_sound" src="aux_sound.htm"></iframe>
+  <iframe id="env_sound" src="env_sound.htm"></iframe>
+  <iframe id="music_sound" src="music_sound.htm"></iframe>
+ <![endif]>
+
+<!--[if IE]>
+  <t:audio id="env_sound" src="sounds/base_background.mp3" repeatcount=10000></t:audio>
+  <t:audio id="silk_sound" src="" repeatcount=10000></t:audio>
+  <t:audio id="aux_sound" src="" repeatcount=10000></t:audio>
+  <t:audio id="music_sound" volume=50 src="sounds/bgmusic.mp3" repeatcount=10000></t:audio>
+<![endif]-->
+</body>
+</html>
