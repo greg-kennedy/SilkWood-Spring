@@ -128,7 +128,7 @@ function scheduler()
           }
           la.style.left = 10 + (b * 60);
           la.style.top = 25 + a * 80;
-          sch_taskBar.insertBefore(la);
+          sch_taskBar.insertBefore(la,null);
           yp++;
         }
       }

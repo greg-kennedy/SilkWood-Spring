@@ -213,6 +213,9 @@ function setOpacity(i,op)
       }
       e.style.opacity = op/100;
      break;
+    case "webpage":
+      e.style.opacity = op + "%";
+     break;
   }
 
 
@@ -264,6 +267,9 @@ function playAuxSound()
   }else if(platform == "mac")
   {
     aux_sound.Play();
+  }else
+  {
+    console.error("playAuxSound unimplemented for " + platform);
   }
   
 }
@@ -764,9 +770,12 @@ function openCutScene(s)
   if(platform == "hta")
   {
     sceneString = "<object type=application/x-shockwave-flash width='296' height='160><PARAM NAME='loop' value='false'><PARAM NAME=Movie value='"+scene+"'></object>"
-  }else
+  }else if(platform == "mac")
   {
     sceneString = '<embed src="'+scene+'" quality="high" width="296" height="160" type="application/x-shockwave-flash" />' 
+  }else
+  {
+    console.error("sceneString(" + s + ") unimplemented for " + platform);
   }
   cutSceneDiv.innerHTML = sceneString;
   btn_replayCut.style.display = "block";
@@ -805,6 +814,9 @@ function part2WebPreview()
   }else if(platform == "mac")
   {
     parent.openWLink(reflectiveLink);     
+  }else if(platform == "webpage")
+  {
+    window.open(reflectiveLink, "_blank");
   }
 }
 
@@ -972,6 +984,9 @@ function showReflectiveTV()
   }else if(platform == "mac")
   {
     parent.openWLink(reflectiveLink);     
+  }else if(platform == "webpage")
+  {
+    window.open(reflectiveLink, "_blank");
   }
 }
 
@@ -985,6 +1000,9 @@ function reflectiveWeb()
   }else if(platform == "mac")
   {
     parent.openWLink(reflectiveLink);     
+  }else if(platform == "webpage")
+  {
+    window.open(reflectiveLink, "_blank");
   }
 }
 
@@ -1103,7 +1121,7 @@ function saveState()
         
   appendGameData(getSchedulerData()  + "|"); //index 17  Default Schedule
 
-  appendGameData(theWeather.curWxSta + "|" + theWeather.curWxName + "|" + theWeather.unit + "|" + theWeather.timeUnit + "|");   //index 18,19,20,21
+  appendGameData(JSON.stringify(theWeather.curWxSta) + "|" + theWeather.curWxName + "|" + theWeather.unit + "|" + theWeather.timeUnit + "|");   //index 18,19,20,21
     
   appendGameData(actionStatusArray.join(",")  + "|"); //index 22  Default Schedule
     
@@ -1140,9 +1158,24 @@ function saveGameData(d)
     fileOut = fso.OpenTextFile(fileIn,2,true);
     fileOut.write(d);
     fileOut.close();
-  }else
+  }else if(platform == "mac")
   {
     parent.saveData("/bin/echo " + escape(d) + " > saveFile.sww",null);
+  }else
+  {
+    // use Javascript Cookie - game save lasts 1 year
+    //  first clear any existing cookie for this site
+    document.cookie.split(/;\s*/).forEach( (element) => {
+      var matches = element.match( /^([^=]+)/ );
+      if (matches) {
+        document.cookie = matches[1] + "=;max-age=0;path=/;samesite=strict";
+      }
+    })
+    var da = btoa(d).match(/.{1,3072}/g);
+    for(var i=0;i<da.length;i++)
+    {
+      document.cookie = "sww" + i + "=" + da[i] + ";max-age=31536000;path=/;samesite=strict";
+    }
   }
 }
 
@@ -1202,7 +1235,7 @@ function readState()
   masterPlan.loadSchedule(activeScheduleArray);
   
   //Weather Setup data
-  theWeather.curWxSta = fa[18];
+  theWeather.curWxSta = JSON.parse(fa[18]);
   theWeather.curWxName = fa[19];
   theWeather.unit = fa[20];
   theWeather.timeUnit = fa[21];
@@ -1244,6 +1277,9 @@ function readState()
   if(!sound_music)
   {
     soundMan.stop("music");
+  }else
+  {
+    soundMan.play("bgmusic","music");
   }
 
   if(!sound_environment)
@@ -1302,7 +1338,7 @@ function getGameData()
     {
       return false;
     }
-  }else
+  }else if(platform == "mac")
   {
     req = new XMLHttpRequest(); 
     if(gameStage == -1)
@@ -1319,6 +1355,18 @@ function getGameData()
         return rData; 
     } 
     return false;
+  }else
+  {
+    // use Javascript Cookie - game save lasts 1 year
+    var cookies = [];
+    document.cookie.split(/;\s*/).forEach( (element) => {
+      var matches = element.match( /^sww(\d+)=(.+)$/ );
+      if (matches) {
+        cookies[matches[1]] = matches[2];
+      }
+    })
+
+    return atob(cookies.join(""));
   }
 }
 
@@ -1442,10 +1490,15 @@ function stopSoundElement(e)
   if(platform == "hta")
   {
     eval(e + "_sound.endElement()");
-  }else
+  }else if(platform == "mac")
   {
     eval("soundMan.stat_" + e + " = 'null'");
     eval(e+"_sound.window.location.reload()");
+  }else
+  {
+    soundMan["stat_" + e] = null;
+    var w = document.getElementById(e + "_sound");
+    w.contentWindow.location.reload();
   }
 }
 
@@ -1456,10 +1509,15 @@ function playSoundElement(s,e)
   {
     eval(e + "_sound.src = 'sounds/" + s + ".mp3'");
     eval(e + "_sound.beginElement()");
-  }else
+  }else if(platform == "mac")
   {
     eval("soundMan.stat_" + e + " = '" + s + "'");
     eval(e+"_sound.window.location.reload()");
+  }else
+  {
+    soundMan["stat_" + e] = (s != 'null' ? s : null);
+    var w = document.getElementById(e + "_sound");
+    w.contentWindow.location.reload();
   }
 }
 

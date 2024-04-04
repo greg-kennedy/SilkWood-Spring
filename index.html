@@ -1,84 +1,62 @@
-<!-- Entire Script copyright 2007 Dexter Kofa/Reflective Layer -->
-
-
-<HTML XMLNS:t ="urn:schemas-microsoft-com:time">
-<?IMPORT namespace="t" implementation="#default#time2">
-<head>
-<script>
-var platform = "mac";
-
-function init()
-{
-  if(platform == "hta")
-  {
-     window.resizeTo(810,235);		//235
-  }
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SilkWood Spring Demo</title>
+    <link rel="icon" href="./silkwood.ico" type="image/x-icon" />
+    <style>
+* {
+  margin: 0;
+  padding: 0;
+  border: 0
 }
 
-function setMacEvents()
-{
-  widget.onshow = showEvent;
-  widget.onhide = hideEvent;
+html {
+  height: 100%;
+  background: black
 }
 
-
-function openWLink(l)
-{
-  widget.openURL(l);
+body {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center
 }
 
-function saveData(d)
-{
-    widget.system(d,null);
-}
-//*************************************************************
-
-
-function hideEvent()
-{
-  silk_code.frontDisplay.style.display = "none";
-  silk_code.UI_weather.style.display = "none";
-  //windAnimation.stop();
-  silk_code.sky.stopCloud();
-  silk_code.soundMan.mute();
-  silk_code.windmill.stop();
-
-  if(silk_code.sky.precipitation)
-  {
-    silk_code.precipAnimation.stop()
-  }
+div#title {
+  position: relative;
+  border: 2px;
+  border-style: inset
 }
 
-
-function showEvent()
-{
-  //windAnimation.start();
-  silk_code.sky.moveCloud();
-  silk_code.getSoundState();
-  silk_code.frontDisplay.style.display = "block";
-  silk_code.windmill.start();
-  if(silk_code.sky.precipitation)
-  {
-    silk_code.precipAnimation.start()
-  }
+div#title>h1 {
+  position: absolute;
+  width: 100%;
+  top: 24px;
+  color: white;
+  text-align: center;
+  text-shadow: 2px 2px black
 }
 
-
-</script>
-<link rel=STYLESHEET href="silkwood.css" Type="text/css"></link>
-  <TITLE>SilkWood Spring Demo</TITLE>
-  <HTA:APPLICATION ID="silkwood 100"
-    APPLICATIONNAME="SilkWood 100"
-    BORDER="thin"
-    CAPTION="yes"
-    ICON="silkwood.ico"
-    SHOWINTASKBAR="yes"
-    SINGLEINSTANCE="no"
-    SYSMENU="yes"
-    MAXIMIZEBUTTON="no"
-    CONTEXTMENU="no"
-    >
-<body style="overflow:hidden" text="white" bgcolor="black" id="masterFrame" onload="init()">
-  <iframe application="yes" style="position:absolute; left:0; top:0" id="silk_code" width="800" height="200" src="silk_code.htm"></iframe>
-</body>
+div#title>img {
+  display: block
+}
+    </style>
+    <script>
+function play() {
+  iframe = document.createElement('iframe');
+  iframe.src = 'silk.htm';
+  iframe.width = 804;
+  iframe.height = 204;
+  document.getElementById("title").replaceWith(iframe);
+}
+    </script>
+  </head>
+  <body>
+    <div id="title" width="804" height="204" onclick="play();">
+      <h1>Click to play!</h1>
+      <img width="800" height="200" src="Default.png">
+    </div>
+  </body>
 </html>

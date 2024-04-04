@@ -13,15 +13,25 @@ function weatherObj()
   this.forecast1Cond;
   this.forecast2Cond;
   this.obvTime;		//time the last weather was taken
-  this.updatating = false;	//is true when world is getting new  weather data
-  this.curWxSta = "USPA0311";
+  this.updating = false;	//is true when world is getting new  weather data
+  this.curWxSta = { Lat: 40.1856597, Lon: -75.451571 };
   this.curWxName = "Collegeville, PA";
-  this.penWxSta = "uspa0311";
+  this.penWxSta = { Lat: 40.1856597, Lon: -75.451571 };
   this.penWxStaName = "Collegeville,PA";
   this.searchSize = 0;	//size of search result
   this.unit = "F";
   this.timeUnit = "24";
   this.rqObject;	//http request object
+
+  this.getApiKey = function()
+  {
+    // that's not the real key, we do a little decode thing to get it
+    //  please don't steal my key, get your own, it's free for the first 1000 calls
+    var k = [ 0x64, 0xbd, 0x07, 0x19, 0xa7, 0x7b, 0x9c, 0x07, 0x71, 0x4b, 0x40, 0x5c, 0xdd, 0xc6, 0x98, 0x05 ];
+
+    return k.map((x) => (x ^ 0xff).toString(16)).join("");
+  }
+
   if(platform == "hta")
   {
     this.xDoc = new ActiveXObject("Microsoft.XMLDOM");
@@ -36,6 +46,9 @@ function weatherObj()
           this.rqObject = new ActiveXObject("Msxml2.XMLHTTP");
          break;
         case "mac":
+          this.rqObject = new XMLHttpRequest();
+         break;
+        case "webpage":
           this.rqObject = new XMLHttpRequest();
          break;
      }
@@ -65,7 +78,7 @@ function weatherObj()
     {
       this.rqObject.overrideMimeType("text/xml");
     }
-    this.rqObject.open("GET", "http://xoap.weather.com/search/search?where=" + weatherCity_IN.value);
+    this.rqObject.open("GET", "https://api.openweathermap.org/geo/1.0/direct?q=" + encodeURIComponent(weatherCity_IN.value) + "&limit=5&appid=" + this.getApiKey() );
     this.rqObject.send(null); 
   
   }
@@ -95,7 +108,7 @@ function weatherObj()
           li.onclick = function(){theWeather.selectWeather(this.title,this.innerHTML)};
          weatherSearchResult.appendChild(li);
         }
-      }else
+      }else if(platform == "mac")
       {
         wxR = theWeather.rqObject.responseXML;
         rm = wxR.getElementsByTagName("loc");	  
@@ -112,6 +125,22 @@ function weatherObj()
           li.onclick = function(){theWeather.selectWeather(this.title,this.innerHTML)};
           weatherSearchResult.appendChild(li);
         }      
+      }else
+      {
+        wxR = JSON.parse(theWeather.rqObject.responseText);
+        theWeather.searchSize = wxR.length;
+        for(var a=0;a<wxR.length;a++)
+        {
+          li = document.createElement("div");
+          li.style.position = "absolute";
+          li.title = JSON.stringify({ Lat: wxR[a].lat, Lon: wxR[a].lon });
+          li.style.left = 0;
+          li.style.top = 20 * a;
+          li.style.cursor = "pointer";
+          li.innerHTML = [wxR[a].name, wxR[a].state, wxR[a].country].join(", ");
+          li.onclick = function(){theWeather.selectWeather(this.title,this.innerHTML)};
+          weatherSearchResult.appendChild(li);
+        }
       }
       if(theWeather.searchSize == 0)
       {
@@ -140,7 +169,7 @@ function weatherObj()
   this.selectWeather = function(wId,wName)
   {
   
-     theWeather.penWxSta = wId;
+     theWeather.penWxSta = JSON.parse(wId);
      WxStaName.innerHTML = wName;
      theWeather.penWxStaName = wName;     
   }
@@ -170,7 +199,7 @@ function weatherObj()
     this.updating = true;
     this.xmlObj();
     this.rqObject.onreadystatechange = theWeather.receiveWeather;
-    this.rqObject.open("GET", "http://xml.weather.yahoo.com/forecastrss?u=c&p=" + encodeURIComponent(this.curWxSta), true);
+    this.rqObject.open("GET", "https://api.openweathermap.org/data/3.0/onecall?lat=" + encodeURIComponent(this.curWxSta.Lat) + "&lon=" + encodeURIComponent(this.curWxSta.Lon) + "&units=metric&exclude=minutely,hourly,alerts&appid=" + this.getApiKey() );
     this.rqObject.send(null); 
   }
   
@@ -179,13 +208,13 @@ function weatherObj()
   {
     if(theWeather.rqObject.readyState == 4 )
     {
-	if(theWeather.parseWeather(theWeather.rqObject.responseXML,false))
+	if(theWeather.parseWeather(theWeather.rqObject.responseXML || JSON.parse(theWeather.rqObject.responseText),false))
 	{
 	  WxFrontName.innerHTML = theWeather.penWxStaName;
 	  theWeather.processWeather();
 	}
     }
-    this,updating = false;
+    this.updating = false;
   }
 
 
@@ -262,6 +291,83 @@ function weatherObj()
 	   tempDiv.style.color = "red";
 	   return;
 	}        
+    }else
+    {
+    //Check validity of returned data
+        try
+        {
+          l = this.obvTime;
+          this.obvTime = wx.current.dt;
+          if(l == this.obvTime && !o)
+          {
+            c = false;		//if weather has not changed then ignore the rest
+          }else
+          {
+
+            function stamp2time(t) {
+              sun = new Date(t);
+              if (sun.getHours() > 12) {
+                return (sun.getHours() - 12) + ":" + sun.getMinutes() + " pm";
+              } else if (sun.getHours() == 0) {
+                return "12:" + sun.getMinutes() + " am";
+              } else {
+                return sun.getHours() + ":" + sun.getMinutes() + " am";
+              }
+            }
+
+            this.wind = wx.current.wind_speed * 2.23694;
+            this.temperature = wx.current.temp;
+            this.sunrise = stamp2time(wx.current.sunrise * 1000);
+            this.sunset = stamp2time(wx.current.sunset * 1000);
+
+            // translate OpenWeatherMap weather Icon to Yahoo (XOAP) weather code
+            //  icon is a bit easier to understand than ID ranges
+            var owmId = wx.current.weather[0].icon;
+            owmId = owmId.substring(0, owmId.length - 1);
+            switch(owmId)
+            {
+              case "01":	// clear sky
+                this.sky = "32";
+                break;
+              case "02":	// few clouds
+                this.sky = "33";
+                break;
+              case "03":	// scattered clouds
+                this.sky = "29";
+                break;
+              case "04":	// broken clouds
+                this.sky = "27";
+                break;
+              case "09":	// shower rain
+              case "10":	// rain
+              case "11":	// thunderstorm
+                this.sky = "5";
+                break;
+              case "13":	// snow
+                this.sky = "7";
+                break;
+              case "50":	// mist
+                this.sky = "0";
+                break;
+              default:	// unknown / error
+                this.sky = "3200";
+            }
+
+            this.forecast1Date = new Date(wx.daily[0].dt * 1000).toDateString();
+            this.forecast2Date = new Date(wx.daily[1].dt * 1000).toDateString();
+
+            this.forecast1Cond = "Low: " + stdTemp(wx.daily[0].temp.min,false);
+            this.forecast1Cond = this.forecast1Cond + "&nbsp;&nbsp;&nbsp;High: " + stdTemp(wx.daily[0].temp.max,false);
+            this.forecast1Cond = this.forecast1Cond + "<br>Sky: " + wx.daily[0].weather[0].description;
+            this.forecast2Cond = "Low: " + stdTemp(wx.daily[1].temp.min,false);
+            this.forecast2Cond = this.forecast2Cond + "&nbsp;&nbsp;&nbsp;High: " + stdTemp(wx.daily[1].temp.max,false);
+            this.forecast2Cond = this.forecast2Cond + "<br>Sky: " + wx.daily[1].weather[0].description;
+          }
+        } catch (error)
+        {
+           tempDiv.style.color= "red";
+           return;
+        }
     }
     this.dawnThreshold = convertSunTime(this.sunrise) - 30; //time shen sunrise starts - 15 minutes
     this.duskThreshold = convertSunTime(this.sunset) - 30; //time when sunset starts - 15 minutes
